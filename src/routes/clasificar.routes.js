@@ -5,7 +5,7 @@ const axios = require('axios');
 
 // Suponiendo que tu Lambda esté expuesta vía API Gateway en la URL:
 // https://xxxxx.execute-api.us-east-1.amazonaws.com/prod/clasificar
-const LAMBDA_ENDPOINT = process.env.LAMBDA_ENDPOINT || 'https://...';
+const LAMBDA_ENDPOINT = process.env.LAMBDA_ENDPOINT || 'https://m5tlpj9qsa.execute-api.us-east-2.amazonaws.com/prod/clasificar';
 
 router.post('/', async (req, res) => {
   try {
