@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="UTF-8" />
+    <title>Clasificación de Imágenes</title>
+  </head>
+  <body>
+    <h1>Subir Imagen para Clasificación</h1>
+    <form id="uploadForm">
+      <input type="file" id="imageInput" accept="image/*" />
+      <button type="submit">Subir</button>
+    </form>
+
+    <div id="result"></div>
+
+    <script>
+      const form = document.getElementById('uploadForm');
+      const imageInput = document.getElementById('imageInput');
+      const resultDiv = document.getElementById('result');
+
+      form.addEventListener('submit', async (e) => {
+        e.preventDefault();
+
+        // Verificar que se haya seleccionado un archivo
+        if (!imageInput.files.length) {
+          alert('Por favor, selecciona una imagen');
+          return;
+        }
+
+        // Tomamos el primer archivo
+        const file = imageInput.files[0];
+        const fileName = file.name;
+
+        // Convertir el archivo a Base64
+        const base64String = await toBase64(file);
+
+        // Llamar a tu backend Node.js
+        // Asegúrate de apuntar a la URL correcta (puerto, dominio o IP):
+        // Ej: http://localhost:3000/api/clasificar (o /api/imagenes, según tu ruta)
+        const backendUrl = 'http://TU-BACKEND-URL.com/api/clasificar';
+
+        try {
+          const response = await fetch(backendUrl, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              image: base64String,
+              fileName: fileName
+            })
+          });
+          const data = await response.json();
+
+          if (response.ok) {
+            // Mostrar resultado
+            const { classification, backendResponse } = data;
+            resultDiv.innerHTML = `
+              <p><strong>Tipo Detectado:</strong> ${classification.typeDetected}</p>
+              <p><strong>Descripción:</strong> ${classification.description}</p>
+              <p>Datos guardados en BD: ${JSON.stringify(backendResponse)}</p>
+            `;
+          } else {
+            // Manejo de error
+            resultDiv.innerHTML = `<p><strong>Error:</strong> ${data.message || 'Desconocido'}</p>`;
+          }
+        } catch (error) {
+          console.error(error);
+          resultDiv.innerHTML = `<p><strong>Error interno:</strong> ${error.message}</p>`;
+        }
+      });
+
+      // Helper: función para convertir un File a Base64
+      function toBase64(file) {
+        return new Promise((resolve, reject) => {
+          const reader = new FileReader();
+          reader.readAsDataURL(file);
+          reader.onload = () => resolve(reader.result.split(',')[1]); 
+          // O reader.result completo si tu backend necesita "data:image/png;base64,...."
+          reader.onerror = (error) => reject(error);
+        });
+      }
+    </script>
+  </body>
+</html>
