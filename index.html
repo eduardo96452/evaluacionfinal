@@ -1,46 +1,64 @@
 <!DOCTYPE html>
-<html>
+<html lang="es">
   <head>
     <meta charset="UTF-8" />
-    <title>Clasificación de Imágenes</title>
+    <title>Listado de Imágenes Guardadas</title>
+    <!-- Bootstrap CDN -->
+    <link
+      rel="stylesheet"
+      href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css"
+    />
   </head>
   <body>
-    <h1>Subir Imagen para Clasificación</h1>
-    <form id="uploadForm">
-      <input type="file" id="imageInput" accept="image/*" />
-      <button type="submit">Subir</button>
-    </form>
+    <div class="container">
+      <h1 class="mt-5">Subir Imagen para Clasificación</h1>
+      <form id="uploadForm" class="mt-3">
+        <div class="form-group">
+          <input
+            type="file"
+            id="imageInput"
+            accept="image/*"
+            class="form-control-file"
+            required
+          />
+        </div>
+        <button type="submit" class="btn btn-primary">Subir</button>
+      </form>
 
-    <div id="result"></div>
+      <!-- Mensaje de respuesta -->
+      <div id="result" class="mt-4"></div>
+      <!-- Tabla para listar todas las imágenes guardadas -->
+      <div id="imagesTable" class="mt-4"></div>
+    </div>
 
     <script>
       const form = document.getElementById('uploadForm');
       const imageInput = document.getElementById('imageInput');
       const resultDiv = document.getElementById('result');
+      const imagesTableDiv = document.getElementById('imagesTable');
+
+      // URL de tu API Gateway para clasificación e inserción vía Lambda
+      const apiGatewayUrl = 'https://m5tlpj9qsa.execute-api.us-east-2.amazonaws.com/prod/clasificar';
+      // URL del backend para obtener todas las imágenes guardadas (GET)
+      const backendGetUrl = 'http://3.231.105.105:3000/api/imagenes';
 
       form.addEventListener('submit', async (e) => {
         e.preventDefault();
 
-        // Verificar que se haya seleccionado un archivo
         if (!imageInput.files.length) {
-          alert('Por favor, selecciona una imagen');
+          alert('Por favor, selecciona una imagen.');
           return;
         }
 
-        // Tomamos el primer archivo
         const file = imageInput.files[0];
         const fileName = file.name;
 
-        // Convertir el archivo a Base64
-        const base64String = await toBase64(file);
-
-        // Llamar a tu backend Node.js
-        // Asegúrate de apuntar a la URL correcta (puerto, dominio o IP):
-        // Ej: http://localhost:3000/api/clasificar (o /api/imagenes, según tu ruta)
-        const backendUrl = 'http://TU-BACKEND-URL.com/api/clasificar';
-
         try {
-          const response = await fetch(backendUrl, {
+          // Convertir la imagen a Base64
+          const base64String = await toBase64(file);
+
+          // Llamar a la función Lambda a través del API Gateway
+          const response = await fetch(apiGatewayUrl, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
@@ -48,36 +66,112 @@
               fileName: fileName
             })
           });
+
           const data = await response.json();
 
           if (response.ok) {
-            // Mostrar resultado
-            const { classification, backendResponse } = data;
+            // La respuesta tiene la estructura:
+            // { statusCode: 200, body: "{\"message\":\"Clasificación exitosa\",\"classification\":{\"typeDetected\":\"...\",\"description\":\"...\"},\"insertedImage\":{...}}" }
+            // Parseamos el string JSON contenido en la propiedad "body"
+            const parsedBody = JSON.parse(data.body);
+            const { message, classification } = parsedBody;
+
             resultDiv.innerHTML = `
-              <p><strong>Tipo Detectado:</strong> ${classification.typeDetected}</p>
-              <p><strong>Descripción:</strong> ${classification.description}</p>
-              <p>Datos guardados en BD: ${JSON.stringify(backendResponse)}</p>
+              <div class="alert alert-success" role="alert">
+                <h4 class="alert-heading">${message}</h4>
+                <p><strong>Tipo Detectado:</strong> ${classification.typeDetected}</p>
+                <p><strong>Descripción:</strong> ${classification.description}</p>
+              </div>
             `;
+
+            // Luego de insertar, cargamos todas las imágenes guardadas
+            loadImages();
           } else {
-            // Manejo de error
-            resultDiv.innerHTML = `<p><strong>Error:</strong> ${data.message || 'Desconocido'}</p>`;
+            let errorMsg = 'Error desconocido';
+            try {
+              const parsedBody = JSON.parse(data.body);
+              errorMsg = parsedBody.message || errorMsg;
+            } catch (e) {
+              errorMsg = data.message || errorMsg;
+            }
+
+            resultDiv.innerHTML = `
+              <div class="alert alert-danger" role="alert">
+                <p><strong>Error:</strong> ${errorMsg}</p>
+              </div>
+            `;
           }
         } catch (error) {
           console.error(error);
-          resultDiv.innerHTML = `<p><strong>Error interno:</strong> ${error.message}</p>`;
+          resultDiv.innerHTML = `
+            <div class="alert alert-danger" role="alert">
+              <p><strong>Error interno:</strong> ${error.message}</p>
+            </div>
+          `;
         }
       });
 
-      // Helper: función para convertir un File a Base64
+      // Función para convertir un archivo a Base64 (retorna solo la parte Base64)
       function toBase64(file) {
         return new Promise((resolve, reject) => {
           const reader = new FileReader();
           reader.readAsDataURL(file);
-          reader.onload = () => resolve(reader.result.split(',')[1]); 
-          // O reader.result completo si tu backend necesita "data:image/png;base64,...."
+          reader.onload = () => {
+            // Extraemos solo la parte Base64, sin el prefijo "data:image/png;base64,"
+            const base64 = reader.result.split(',')[1];
+            resolve(base64);
+          };
           reader.onerror = (error) => reject(error);
         });
       }
+
+      // Función para cargar todas las imágenes guardadas desde el backend
+      async function loadImages() {
+        try {
+          const response = await fetch(backendGetUrl);
+          const images = await response.json();
+          let tableHTML = `
+            <h3>Listado de Imágenes Guardadas</h3>
+            <table class="table table-bordered">
+              <thead>
+                <tr>
+                  <th>ID</th>
+                  <th>Nombre</th>
+                  <th>Tipo Detectado</th>
+                  <th>Descripción</th>
+                  <th>Imagen</th>
+                </tr>
+              </thead>
+              <tbody>
+          `;
+
+          images.forEach(image => {
+            tableHTML += `
+              <tr>
+                <td>${image.id}</td>
+                <td>${image.nombre}</td>
+                <td>${image.tipo_detectado}</td>
+                <td>${image.descripcion}</td>
+                <td>
+                  <!-- Se muestra la imagen renderizada a partir del Base64.
+                       Ajusta el tipo de imagen (png, jpeg, etc.) según corresponda. -->
+                  <img src="data:image/png;base64,${image.archivo}" alt="Imagen" style="max-width:200px; max-height:200px;">
+                </td>
+              </tr>
+            `;
+          });
+
+          tableHTML += `</tbody></table>`;
+          imagesTableDiv.innerHTML = tableHTML;
+        } catch (error) {
+          console.error('Error fetching images:', error);
+          imagesTableDiv.innerHTML = `<div class="alert alert-danger">Error al cargar las imágenes.</div>`;
+        }
+      }
+
+      // Cargar imágenes al iniciar la página (opcional)
+      window.addEventListener('load', loadImages);
     </script>
   </body>
 </html>
+
