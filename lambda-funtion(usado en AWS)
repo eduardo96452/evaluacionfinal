@@ -1,0 +1,82 @@
+const axios = require('axios');
+
+// Función dummy para clasificar la imagen
+function classifyImage(imageData) {
+  let typeDetected = 'Foto';
+  let description = 'Imagen de una foto';
+
+  if (imageData.includes('document')) {
+    typeDetected = 'Documento';
+    description = 'Imagen de un documento';
+  } else if (imageData.includes('invoice')) {
+    typeDetected = 'Factura';
+    description = 'Imagen de una factura';
+  }
+  return { typeDetected, description };
+}
+
+// Handler de la función Lambda
+exports.handler = async (event) => {
+  try {
+    // Parsear el evento (puede venir como string o ya parseado)
+    let body = event;
+    if (typeof event === 'string') {
+      body = JSON.parse(event);
+    }
+
+    // Se espera que el body contenga: { image, s3Path, fileName }
+    let imageData;
+    if (body.image) {
+      imageData = body.image;
+    } else if (body.s3Path) {
+      // Aquí podrías descargar la imagen desde S3
+      imageData = "dummy image data from s3";
+    } else {
+      throw new Error("No se proporcionó imagen (base64 ni s3Path).");
+    }
+
+    // Clasificar la imagen
+    const { typeDetected, description } = classifyImage(imageData);
+
+    // Obtener el nombre del archivo (o asignar un valor por defecto)
+    const fileName = body.fileName || "archivo_desconocido";
+
+    // Definir la URL de la API del backend que inserta la imagen en la BD
+    const backendAPI = process.env.BACKEND_API_URL || 'http://3.231.105.105:3000/api/imagenes';
+
+    // Enviar el payload, guardando la imagen en Base64 en 'archivo'
+    const payload = {
+      nombre: fileName,
+      tipo_detectado: typeDetected,
+      descripcion: description,
+      archivo: imageData  // Guardamos la imagen en Base64
+    };
+
+    // Invocar la API del backend (método POST)
+    const response = await axios.post(backendAPI, payload);
+
+    // Supongamos que el backend retorna el registro insertado, por ejemplo:
+    // { id: '...', nombre: '...', tipo_detectado: '...', descripcion: '...', archivo: '...' }
+    const insertedImage = response.data;
+
+    // Retornar la respuesta incluyendo el registro insertado
+    return {
+      statusCode: 200,
+      body: JSON.stringify({
+        message: 'Clasificación exitosa',
+        classification: { typeDetected, description },
+        insertedImage: insertedImage
+      })
+    };
+
+  } catch (error) {
+    console.error("Error:", error);
+    return {
+      statusCode: 500,
+      body: JSON.stringify({
+        message: 'Error en la clasificación',
+        error: error.message
+      })
+    };
+  }
+};

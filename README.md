@@ -21,15 +21,20 @@ Despliegue en AWS - Lightsail
 5. Configurar firewall (puerto 3000, o redireccionar puerto 80).
 
 6. Opcionalmente, usar pm2 para mantener la app en ejecución:
-
 npm install -g pm2
 pm2 start src/index.js
 pm2 save
 pm2 startup
 
+![alt text](image-2.png)
 
+![alt text](image-3.png)
 
+![alt text](image-4.png)
 
+![alt text](image-5.png)
+
+----------------------------------------------------------------------------------------------------
 
 Parte 2: Función Lambda
 
@@ -77,10 +82,15 @@ Despliegue de la Lambda
 2. Configura la variable de entorno BACKEND_API_URL en la consola de Lambda.
 3. Crea un API Gateway que dispare la Lambda en un endpoint público.
 
+![alt text](image-7.png)
 
+![alt text](image-6.png)
 
+![alt text](image-8.png)
 
+![alt text](image-9.png)
 
+----------------------------------------------------------------------------------------------------
 
 Parte 3: Integración
 
